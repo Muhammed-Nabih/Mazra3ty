@@ -47,6 +47,17 @@ class UserController {
     };
 
 
+	listUserByRole = async(req, res) => {
+        try {
+            const user = await this.userService.listUserByRole(req.params.role);
+            const { status, message, data } = user.response;
+            res.status(user.statusCode).send({ status, message, data });
+        } catch (e) {
+            res.status(httpStatus.BAD_GATEWAY).send(e);
+        }
+    };
+
+
     delete = async(req, res) => {
         try {
             const user = await this.userService.delete(req.params.id);

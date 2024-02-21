@@ -42,6 +42,19 @@ class UserService {
         }
     };
 
+	listUserByRole = async(role) => {
+
+		let statusCode = httpStatus.OK;
+        try {
+            let user = await this.userDao.findAllByWhere({ role });
+			console.log(user);
+
+            return responseHandler.returnSuccess(statusCode, 'تم  بنجاح' , user);
+        } catch (e) {
+            return responseHandler.returnError(httpStatus.BAD_GATEWAY, 'Something Went Wrong in update UserService class!!');
+        }
+    }
+
 
 
     /**

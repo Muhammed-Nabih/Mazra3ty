@@ -1,15 +1,16 @@
 const express = require('express');
+const router = express.Router();
 const UserController = require('../controllers/userController');
 const UserValidator = require('../validator/UserValidator');
-const router = express.Router();
-// const auth = require('../middlewares/auth');
+const auth = require('../middlewares/auth');
 
-const userController = new UserController();
-const userValidator = new UserValidator();
+const { create, delete: deleteUser, update, listUserByRole } = new UserController();
+const { createValidator, updateValidator } = new UserValidator();
 
-router.post('/create', userValidator.createValidator, userController.create);
-router.delete('/delete/:id', userController.delete);
-router.put('/update/:id', userValidator.updateValidator, userController.update);
-// router.put('/change-password',auth(),userValidator.changePasswordValidator, authController.changePassword);
+// Group routes by endpoint
+router.post('/create', auth('admin'), createValidator, create);
+router.delete('/delete/:id', auth('admin'), deleteUser);
+router.put('/update/:id', auth(), updateValidator, update);
+router.get('/list-user/:role', auth('admin'), listUserByRole);
 
 module.exports = router;

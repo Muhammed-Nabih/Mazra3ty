@@ -75,6 +75,14 @@ class SuperDao {
         }
     }
 
+	async findAllByWhere(where) {
+        try {
+            return await this.Model.find(where);
+        } catch (error) {
+            throw new Error('Error fetching find By Where Dao');
+        }
+    }
+
 
     async updateById(id, updatedData) {
         try {

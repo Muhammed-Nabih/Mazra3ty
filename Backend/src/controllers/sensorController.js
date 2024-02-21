@@ -143,7 +143,19 @@ class SensorController {
     };
 
     // ####################################################### END  Rain Drop  Section  #######################################################
+    // ####################################################### start statistics #######################################################
 
+    getStatistics = async(req, res) => {
+        try {
+            const statistics = await this.sensorService.getStatistics();
+            const { message, data, status } = statistics.response;
+            res.status(statistics.statusCode).send({ status, message, data });
+        } catch (e) {
+            res.status(httpStatus.BAD_GATEWAY).send(e);
+        }
+    };
+
+    // ####################################################### End statistics #######################################################
 
 
 

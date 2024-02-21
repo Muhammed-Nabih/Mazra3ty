@@ -2,19 +2,19 @@ const httpStatus = require('http-status');
 const SoilMoistureDao = require('../dao/SoilMoistureDao');
 const WaterLevelDao = require('../dao/WaterLevelDao');
 const FlameDao = require('../dao/FlameDao');
-const PumpDao = require('../dao/PumpDao');
+const PumpDao = require('../dao/pumpDao');
 const RainDropDao = require('../dao/RainDropDao');
 
 const responseHandler = require('../helper/responseHandler');
 const asyncHandler = require('express-async-handler');
-
+const { getIo } = require('../helper/socket');
 class SensorService {
     constructor() {
         this.soilMoistureDao = new SoilMoistureDao();
         this.waterLevelDao = new WaterLevelDao();
         this.flameDao = new FlameDao();
         this.pumpDao = new PumpDao();
-		this.rainDropDao = new RainDropDao();
+        this.rainDropDao = new RainDropDao();
     }
 
     // ####################################################### START  Soil Moisture  Section  #######################################################
@@ -26,7 +26,10 @@ class SensorService {
     addSoilMoisture = asyncHandler(async(body) => {
         try {
             let data = await this.soilMoistureDao.create(body);
-            return responseHandler.returnSuccess(httpStatus.OK, 'Done', data);
+            if (data) {
+                getIo().emit('Statistics', { data: data });
+                return responseHandler.returnSuccess(httpStatus.OK, 'Done', data);
+            }
         } catch (e) {
             console.log(e)
             return responseHandler.returnError(httpStatus.BAD_GATEWAY, 'Something Went Wrong in add Soil Moisture in SensorService  !!');
@@ -60,7 +63,10 @@ class SensorService {
     addWaterLevel = asyncHandler(async(body) => {
         try {
             let data = await this.waterLevelDao.create(body);
-            return responseHandler.returnSuccess(httpStatus.OK, 'Done', data);
+            if (data) {
+                getIo().emit('Statistics', { data: data });
+                return responseHandler.returnSuccess(httpStatus.OK, 'Done', data);
+            }
         } catch (e) {
             console.log(e)
             return responseHandler.returnError(httpStatus.BAD_GATEWAY, 'Something Went Wrong in add  Water Level in SensorService  !!');
@@ -95,7 +101,10 @@ class SensorService {
         const flame = await this.getFlame();
         try {
             let data = await this.flameDao.updateLastCreated(!flame.response.data.fire, 'fire');
-            return responseHandler.returnSuccess(httpStatus.OK, 'Done', data);
+            if (data) {
+                getIo().emit('Flame', { data: data });
+                return responseHandler.returnSuccess(httpStatus.OK, 'Done', data);
+            }
         } catch (e) {
             console.log(e)
             return responseHandler.returnError(httpStatus.BAD_GATEWAY, 'Something Went Wrong in add  Flame in SensorService  !!');
@@ -131,7 +140,10 @@ class SensorService {
         const pump = await this.getPump();
         try {
             let data = await this.pumpDao.updateLastCreated(!pump.response.data.isOn, 'isOn');
-            return responseHandler.returnSuccess(httpStatus.OK, 'Done', data);
+            if (data) {
+                getIo().emit('Pump', { data: data });
+                return responseHandler.returnSuccess(httpStatus.OK, 'Done', data);
+            }
         } catch (e) {
             console.log(e)
             return responseHandler.returnError(httpStatus.BAD_GATEWAY, 'Something Went Wrong in add  Pump in SensorService  !!');
@@ -169,7 +181,10 @@ class SensorService {
         const rainDrop = await this.getRainDrop();
         try {
             let data = await this.rainDropDao.updateLastCreated(!rainDrop.response.data.rain, 'rain');
-            return responseHandler.returnSuccess(httpStatus.OK, 'Done', data);
+            if (data) {
+                getIo().emit('Rain Drop', { data: data });
+                return responseHandler.returnSuccess(httpStatus.OK, 'Done', data);
+            }
         } catch (e) {
             console.log(e)
             return responseHandler.returnError(httpStatus.BAD_GATEWAY, 'Something Went Wrong in add  Rain Drop in SensorService  !!');
@@ -194,7 +209,21 @@ class SensorService {
         }
     };
     // ####################################################### END  Rain Drop  Section  #######################################################
+    // ####################################################### start statistics #######################################################
 
+    getStatistics = async(req, res) => {
+        let statusCode = httpStatus.OK;
+        try {
+            const soilMoisture = await this.soilMoistureDao.findLastCreated();
+            const waterLevel = await this.waterLevelDao.findLastCreated();
+            return responseHandler.returnSuccess(statusCode, 'Done', { soilMoisture, waterLevel });
+        } catch (e) {
+            console.log(e);
+            res.status(httpStatus.BAD_GATEWAY).send(e);
+        }
+    };
+
+    // ####################################################### End statistics #######################################################
 }
 
 module.exports = SensorService;

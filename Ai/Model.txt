@@ -1,0 +1,137 @@
+from tensorflow.keras.preprocessing.image import ImageDataGenerator , load_img , img_to_array
+from keras.models import Sequential
+from keras.layers import Conv2D, Flatten, MaxPool2D, Dense, Dropout, BatchNormalization
+import matplotlib.pyplot as plt
+from keras.applications import InceptionV3, ResNet50
+from keras import Model
+from keras.metrics import Precision, Recall
+
+import numpy as np
+from skimage import transform
+import splitfolders
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import precision_recall_fscore_support
+import seaborn as sns
+
+train_datagen = ImageDataGenerator(
+    rescale=1/255,
+    rotation_range=355,
+    # zoom_range=0.2,
+    # horizontal_flip=True,
+    # vertical_flip=True,
+    # width_shift_range=0.1
+)
+
+test_datagen = ImageDataGenerator(rescale=1/255)
+
+train_dataset = train_datagen.flow_from_directory(
+  'Path_Dataset/train',
+  target_size=(200, 200),
+  class_mode='categorical', 
+  batch_size=100,
+)
+
+test_dataset = test_datagen.flow_from_directory(
+  'Path_Dataset/test',
+  target_size=(200, 200),
+  class_mode='categorical',
+  batch_size=100,
+  shuffle=False
+)
+
+valid_dataset = valid_datagen.flow_from_directory(
+  'Path_Dataset/val',
+  target_size=(200, 200),
+  class_mode='categorical',
+  batch_size=100,
+)
+
+import keras
+METRICS = [
+    'accuracy',
+    keras.metrics.Precision(name='precision'),
+    keras.metrics.Recall(name='recall')
+]
+
+def evaluate(actual, predictions):
+  pre = []
+  for i in predictions:
+    pre.append(np.argmax(i))
+
+  accuracy = (pre == actual).sum() / actual.shape[0]
+  print(f'Accuracy: {accuracy}')
+
+  precision, recall, f1_score, _ = precision_recall_fscore_support(actual, pre, average='macro')
+  print(f'Precision: {precision}')
+  print(f'Recall: {recall}')
+  print(f'F1_score: {f1_score}')
+
+  fig, ax = plt.subplots(figsize=(10,10))
+  conf_mat = confusion_matrix(actual, pre)
+  sns.heatmap(conf_mat, annot=True, fmt='.0f', cmap="YlGnBu", xticklabels=diseases_labels, yticklabels=diseases_labels).set_title('Confusion Matrix Heat map')
+  plt.show()
+
+
+
+diseases_labels = []
+
+for key, value in train_dataset.class_indices.items():
+   diseases_labels.append(key)
+
+
+
+model = Sequential()
+
+model.add(Conv2D(32, (3,3), activation='relu', input_shape=train_dataset.image_shape))
+model.add(MaxPool2D(2))
+
+model.add(Conv2D(32, (3,3), activation='relu'))
+model.add(MaxPool2D(2))
+
+
+model.add(Conv2D(64, (3,3), activation='relu'))
+model.add(MaxPool2D(2))
+
+model.add(Conv2D(64, (3,3), activation='relu'))
+model.add(MaxPool2D(2))
+
+
+model.add(Conv2D(128, (3,3), activation='relu'))
+model.add(MaxPool2D(2))
+
+model.add(Conv2D(128, (3,3), activation='relu'))
+model.add(MaxPool2D(2))
+
+
+model.add(Flatten())
+
+model.add(Dense(512, activation='relu'))
+model.add(Dropout(0.5))
+
+
+model.add(Dense(3, activation='softmax'))
+
+model.summary()
+
+
+
+model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=METRICS)
+
+
+Info = model.fit(
+  train_dataset,
+  validation_data=test_dataset,
+  epochs=40,
+  workers=2
+)
+
+fig, ax = plt.subplots(1, 4, figsize=(20, 3))
+ax = ax.ravel()
+
+for i, met in enumerate(['precision', 'recall', 'accuracy', 'loss']):
+    ax[i].plot(Info.history[met])
+    ax[i].plot(Info.history['val_' + met])
+    ax[i].set_title('Model {}'.format(met))
+    ax[i].set_xlabel('epochs')
+    ax[i].set_ylabel(met)
+    ax[i].legend(['train', 'val'])

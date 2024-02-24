@@ -56,7 +56,7 @@ void loop() {
 
         // Create a JSON document
         DynamicJsonDocument jsonDocument(200);
-        jsonDocument["soilMoisture"] = moistureValue;
+        jsonDocument["outputPercentage"] = moistureValue;
         jsonDocument["motorStatus"] = motorStatus;
         jsonDocument["fireStatus"] = fireStatus;
         jsonDocument["rainStatus"] = rainStatus;

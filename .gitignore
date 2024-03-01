@@ -1,0 +1,9 @@
+
+*.JPG
+*.png
+Ai/.gitattributes
+*.txt
+*.keras
+*.ipynb
+*.pkl
+*.xlsx

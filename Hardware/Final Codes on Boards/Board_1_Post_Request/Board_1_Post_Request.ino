@@ -9,6 +9,11 @@ const int port = 443; // HTTPS port
 
 WiFiClientSecure client;
 
+const char* email = "abdalrahmanhendawy@gmail.com";
+const char* pass = "123456789";
+
+String accessToken; // Store the access token
+
 const int analogSoilPin = A0;   // Soil moisture sensor pin
 const int relay_pin = D1;       // Motor relay pin
 const int flamePin = D2;        // Flame sensor pin
@@ -31,6 +36,16 @@ void setup() {
     // Set the root CA certificate
     client.setInsecure();
 
+    // Authenticate user
+    if (!authenticateUser()) {
+        Serial.println("\nAuthentication failed! You don't have access to Login to send or get data");
+        return;
+    }
+    else {
+        Serial.println("\nWelcome Mohamed Nabih.. Just a second and i will Send the Requests ♥ ");
+    }
+
+
     // Initialize pins
     pinMode(relay_pin, OUTPUT);
     pinMode(flamePin, INPUT);
@@ -41,7 +56,7 @@ void setup() {
 void loop() {
     // Check WiFi connection status
     if (WiFi.status() == WL_CONNECTED) {
-        Serial.println("\n\nPerforming HTTP POST Request\n");
+        Serial.println("\nPerforming HTTP POST Request\n");
 
         // Read soil moisture sensor value and Motor State
         int moistureValueSensor = analogRead(analogSoilPin);
@@ -54,41 +69,100 @@ void loop() {
         // Read rain sensor value
         bool rainStatus = detectRain();
 
-        // Create a JSON document
-        DynamicJsonDocument jsonDocument(200);
-        jsonDocument["outputPercentage"] = moistureValue;
-        jsonDocument["motorStatus"] = motorStatus;
-        jsonDocument["fireStatus"] = fireStatus;
-        jsonDocument["rainStatus"] = rainStatus;
+        // Create a JSON document for soil moisture
+        DynamicJsonDocument soilMoistureJson(200);
+        soilMoistureJson["outputPercentage"] = moistureValue;
+        String soilMoisturePayload;
+        serializeJson(soilMoistureJson, soilMoisturePayload);
 
-        // Serialize JSON to a String
-        String jsonString;
-        serializeJson(jsonDocument, jsonString);
+        // Create a JSON document for motor status
+        DynamicJsonDocument motorStatusJson(200);
+        motorStatusJson["motorStatus"] = motorStatus;
+        String motorStatusPayload;
+        serializeJson(motorStatusJson, motorStatusPayload);
 
-        // Send HTTP POST request
-        int httpResponseCode = sendPostRequest(jsonString);
-        Serial.print("HTTP Response code: ");
-        Serial.println(httpResponseCode);
+        // Create a JSON document for flame status
+        DynamicJsonDocument flameStatusJson(200);
+        flameStatusJson["fireStatus"] = fireStatus;
+        String flameStatusPayload;
+        serializeJson(flameStatusJson, flameStatusPayload);
 
-        // Check HTTP response code
-        if (httpResponseCode == HTTP_CODE_OK) {
-            // Request successful
-            Serial.println("Request successful");
-        } else {
-            // Request failed
-            Serial.print("Error code: ");
-            Serial.println(httpResponseCode);
+        // Create a JSON document for rain status
+        DynamicJsonDocument rainStatusJson(200);
+        rainStatusJson["rainStatus"] = rainStatus;
+        String rainStatusPayload;
+        serializeJson(rainStatusJson, rainStatusPayload);
 
-            // Retry the request after a delay
-            delay(5000);
+
+
+        if (authenticateUser()) {
+            
+            int soilMoistureResponse = sendPostRequest("/api/sensor/soil-moisture", soilMoisturePayload);
+            int motorStatusResponse = sendPostRequest("/api/sensor/pump", motorStatusPayload);
+            int flameStatusResponse = sendPostRequest("/api/sensor/flame", flameStatusPayload);
+            int rainStatusResponse = sendPostRequest("/api/sensor/rain-drop", rainStatusPayload);
+
+            // Print responses
+          if(soilMoistureResponse==HTTP_CODE_OK && motorStatusResponse == HTTP_CODE_OK && flameStatusResponse == HTTP_CODE_OK && rainStatusResponse == HTTP_CODE_OK) {
+              Serial.print("Soil Moisture HTTP Response code: ");
+              Serial.println(soilMoistureResponse);
+              Serial.println("Sent Successfuly");
+              Serial.print("Motor Status HTTP Response code: ");
+              Serial.println(motorStatusResponse);
+              Serial.println("Sent Successfuly");
+              Serial.print("Flame Status HTTP Response code: ");
+              Serial.println(flameStatusResponse);
+              Serial.println("Sent Successfuly");
+              Serial.print("Rain Status HTTP Response code: ");
+              Serial.println(rainStatusResponse);
+              Serial.println("Sent Successfuly");
+          }
         }
+
+
+        
     } else {
         // Wi-Fi disconnected, attempt reconnection
         Serial.println("WiFi Disconnected, attempting reconnection");
         setup_wifi();
-        delay(5000);
+        
+    }
+    delay(5000);
+}
+
+/******************** Auth ******************/
+bool authenticateUser() {
+    DynamicJsonDocument loginJson(200);
+    loginJson["email"] = email;
+    loginJson["password"] = pass;
+
+    String loginPayload;
+    serializeJson(loginJson, loginPayload);
+
+    HTTPClient http;
+    String urll = String("https://") + server + ":" + port + "/api/auth/login";
+    http.begin(client, urll);
+    http.addHeader("Content-Type", "application/json");
+
+    int loginResponse = http.POST(loginPayload);
+
+    if (loginResponse == HTTP_CODE_OK) {
+        // Authentication successful, parse access token
+        String response = http.getString();
+        DynamicJsonDocument authResponseJson(1024);
+        deserializeJson(authResponseJson, response);
+        accessToken = authResponseJson["tokens"]["access"]["token"].as<String>();
+        http.end(); // Close the connection
+        return true;
+    } else {
+        // Authentication failed
+        http.end(); // Close the connection
+        return false;
     }
 }
+
+
+/**************** Sensors ****************/
 
 bool getMotorStatus(int moistureValue) {
     if (moistureValue < 40) {
@@ -127,13 +201,16 @@ void setup_wifi() {
     Serial.println("Connected to WiFi");
 }
 
-int sendPostRequest(String jsonPayload) {
+int sendPostRequest(String endpoint, String jsonPayload) {
     // Make a POST request to the specified endpoint
     HTTPClient http;
-    http.begin(client, server, port, "/api/sensor/data");
+    String url = String("https://") + server + ":" + port + endpoint;
+    http.begin(client, url);
     http.addHeader("Content-Type", "application/json");
+    http.addHeader("Authorization", "Bearer " + accessToken);
     int httpResponseCode = http.POST(jsonPayload);
     http.end();
 
     return httpResponseCode;
 }
+

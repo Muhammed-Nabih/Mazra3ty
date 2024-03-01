@@ -8,6 +8,12 @@ const char* server = "mazr3ty-back.onrender.com";
 const int port = 443; // HTTPS port
 
 WiFiClientSecure client;
+
+const char* email = "abdalrahmanhendawy@gmail.com";
+const char* pass = "123456789";
+String accessToken; // Store the access token
+
+
 const int sensorValue = A0; // Water level sensor pin
 
 void setup() {
@@ -26,12 +32,21 @@ void setup() {
     // Set the root CA certificate
     client.setInsecure();
 
+        // Authenticate user
+    if (!authenticateUser()) {
+        Serial.println("\nAuthentication failed! You don't have access to Login to send or get data");
+        return;
+    }
+    else {
+        Serial.println("\nWelcome Mohamed Nabih.. Just a second and i will Send the Requests ♥ ");
+    }
+
 }
 
 void loop() {
     // Check WiFi connection status
     if (WiFi.status() == WL_CONNECTED) {
-        Serial.println("\n\nPerforming HTTP POST Request\n");
+        Serial.println("\nPerforming HTTP POST Request\n");
 
         // Read water level sensor value
         int waterLevelValue = analogRead(sensorValue);
@@ -44,23 +59,21 @@ void loop() {
         // Serialize JSON to a String
         String jsonString;
         serializeJson(jsonDocument, jsonString);
+        if (authenticateUser()) {
+            // Send HTTP POST request
+            int httpResponseCode = sendPostRequest(jsonString);
+            Serial.print("HTTP Response code: ");
+            Serial.println(httpResponseCode);
 
-        // Send HTTP POST request
-        int httpResponseCode = sendPostRequest(jsonString);
-        Serial.print("HTTP Response code: ");
-        Serial.println(httpResponseCode);
-
-        // Check HTTP response code
-        if (httpResponseCode == HTTP_CODE_OK) {
+            if (httpResponseCode == HTTP_CODE_OK) {
             // Request successful
             Serial.println("Request successful");
         } else {
             // Request failed
             Serial.print("Error code: ");
             Serial.println(httpResponseCode);
+        }
 
-            // Retry the request after a delay
-            delay(5000);
         }
     } else {
         // Wi-Fi disconnected, attempt reconnection
@@ -68,8 +81,39 @@ void loop() {
         setup_wifi();
         delay(5000);
     }
+    delay(5000);
 }
 
+/******************** Auth ******************/
+bool authenticateUser() {
+    DynamicJsonDocument loginJson(200);
+    loginJson["email"] = email;
+    loginJson["password"] = pass;
+
+    String loginPayload;
+    serializeJson(loginJson, loginPayload);
+
+    HTTPClient http;
+    String urll = String("https://") + server + ":" + port + "/api/auth/login";
+    http.begin(client, urll);
+    http.addHeader("Content-Type", "application/json");
+
+    int loginResponse = http.POST(loginPayload);
+
+    if (loginResponse == HTTP_CODE_OK) {
+        // Authentication successful, parse access token
+        String response = http.getString();
+        DynamicJsonDocument authResponseJson(1024);
+        deserializeJson(authResponseJson, response);
+        accessToken = authResponseJson["tokens"]["access"]["token"].as<String>();
+        http.end(); // Close the connection
+        return true;
+    } else {
+        // Authentication failed
+        http.end(); // Close the connection
+        return false;
+    }
+}
 
 
 String getWaterLevel(int sensorValue) {
@@ -99,8 +143,9 @@ void setup_wifi() {
 int sendPostRequest(String jsonPayload) {
     // Make a POST request to the specified endpoint
     HTTPClient http;
-    http.begin(client, server, port, "/api/sensor/data");
+    http.begin(client, server, port, "/api/sensor/water-level");
     http.addHeader("Content-Type", "application/json");
+    http.addHeader("Authorization", "Bearer " + accessToken);
     int httpResponseCode = http.POST(jsonPayload);
     http.end();
 
